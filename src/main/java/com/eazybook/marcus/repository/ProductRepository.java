@@ -9,4 +9,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByNameAndAuthor(String name, String author);
     @Override
     Optional<Product> findById(Long id);
+
+    @Override
+    void deleteById(Long aLong);
 }

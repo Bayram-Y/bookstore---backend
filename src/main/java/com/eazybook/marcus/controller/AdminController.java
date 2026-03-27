@@ -70,4 +70,11 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @DeleteMapping("/products/{id}")
+    public ResponseEntity<ResponseDto> deleteProduct(@PathVariable Long id) {
+        System.out.println("DeleteMapping: deleteProduct");
+        iProductService.deleteProduct(id);
+        return ResponseEntity.ok(new ResponseDto("200", "Product deleted successfully"));
+    }
+
 }

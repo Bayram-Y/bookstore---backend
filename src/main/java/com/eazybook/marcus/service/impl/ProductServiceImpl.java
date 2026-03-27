@@ -105,4 +105,13 @@ public class ProductServiceImpl implements IProductService {
         return transformToDTO(savedProduct);
     }
 
+    @Override
+    public void deleteProduct(Long id) {
+        System.out.println("ProductService: deleteProduct");
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        productRepository.delete(product);
+    }
+
 }
