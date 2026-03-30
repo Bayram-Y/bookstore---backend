@@ -1,6 +1,6 @@
 package com.eazybook.marcus.dto;
 
-import com.eazybook.marcus.enums.Genre;
+import com.eazybook.marcus.enums.Category;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,5 +26,5 @@ public class ProductResponseDto {
     private String language;
     private Integer pages;
     private Integer stock;
-    private Genre genre;
+    private Category category;
 }

@@ -1,6 +1,6 @@
 package com.eazybook.marcus.enums;
 
-public enum Genre {
+public enum Category {
     FICTION,
     NON_FICTION,
     PROGRAMMING,

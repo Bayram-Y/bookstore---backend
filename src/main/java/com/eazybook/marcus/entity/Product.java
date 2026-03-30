@@ -1,6 +1,6 @@
 package com.eazybook.marcus.entity;
 
-import com.eazybook.marcus.enums.Genre;
+import com.eazybook.marcus.enums.Category;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -53,6 +53,6 @@ public class Product extends BaseEntity {
     private Integer stock;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "GENRE", nullable = false)
-    private Genre genre;
+    @Column(name = "category", nullable = false)
+    private Category category;
 }

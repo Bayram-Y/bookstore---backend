@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -70,11 +71,24 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @DeleteMapping("/products/{id}")
-    public ResponseEntity<ResponseDto> deleteProduct(@PathVariable Long id) {
-        System.out.println("DeleteMapping: deleteProduct");
-        iProductService.deleteProduct(id);
-        return ResponseEntity.ok(new ResponseDto("200", "Product deleted successfully"));
+
+    @PutMapping("/products/update-product/{id}")
+    public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable Long id, @ModelAttribute ProductUpdateRequestDto productUpdateRequestDto) {
+        System.out.println("PutMapping: updateProduct");
+        ProductResponseDto response = iProductService.updateProduct(id, productUpdateRequestDto);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+
+    @DeleteMapping("/products/delete-product/{id}")
+    public ResponseEntity<ResponseDto> deleteProduct(@PathVariable Long id) {
+        System.out.println("DeleteMapping: deleteProduct");
+        ProductResponseDto productResponseDto = iProductService.getProduct(id);
+        if(productResponseDto != null) {
+            iProductService.deleteProduct(id);
+            return ResponseEntity.ok(new ResponseDto("200", "Product deleted successfully"));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ResponseDto("404", "Product not found"));
+        }
+    }
 }
