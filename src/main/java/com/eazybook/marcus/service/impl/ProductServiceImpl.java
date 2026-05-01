@@ -8,11 +8,11 @@ import com.eazybook.marcus.repository.ProductRepository;
 import com.eazybook.marcus.service.IProductService;
 import com.eazybook.marcus.util.ImageValidator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements IProductService {
@@ -33,6 +35,7 @@ public class ProductServiceImpl implements IProductService {
     private final ImageServiceImpl imageServiceImpl;
     @Value("${product.upload.dir:uploads/products}")
     private String uploadDir;
+    private static final String IMAGE_PATH = "/uploads/products/";
 
 
     @Cacheable("products")
@@ -89,7 +92,7 @@ public class ProductServiceImpl implements IProductService {
         product.setPopularity(0);
 
          if (fileName != null) {
-                product.setImageUrl("/uploads/products/" + fileName);
+                product.setImageUrl(IMAGE_PATH + fileName);
             }
 
             Product savedProduct = productRepository.save(product);
@@ -128,10 +131,11 @@ public class ProductServiceImpl implements IProductService {
         productRepository.delete(product);
     }
 
+    @Transactional
     @Override
     @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto updateProduct(Long id, ProductUpdateRequestDto dto) {
-        System.out.println("ProductService: updateProduct");
+        log.info("Updating product with id: {}", id);
 
         //  1.find Product
         Product product = productRepository.findById(id)
@@ -141,93 +145,74 @@ public class ProductServiceImpl implements IProductService {
         String name = dto.getName() != null ? dto.getName() : product.getName();
         String author = dto.getAuthor() != null ? dto.getAuthor() : product.getAuthor();
 
-        boolean exists = productRepository
-                .existsByNameAndAuthorAndIdNot(name, author, id);
-
-        if (exists) {
+        if (productRepository.existsByNameAndAuthorAndIdNot(name, author, id)) {
             throw new RuntimeException("Product already exists!");
         }
 
-
         //  3. FIELD UPDATE
+          updateFields(product, dto);
 
-        if (dto.getName() != null) {
-            product.setName(dto.getName());
-        }
+        String newFileName = null;
+        String oldImage = product.getImageUrl();
 
-        if (dto.getDescription() != null) {
-            product.setDescription(dto.getDescription());
-        }
-
-        if (dto.getPrice() != null) {
-            product.setPrice(dto.getPrice());
-        }
-
-        if (dto.getAuthor() != null) {
-            product.setAuthor(dto.getAuthor());
-        }
-
-        if (dto.getPublishedDate() != null) {
-            product.setPublishedDate(dto.getPublishedDate());
-        }
-
-        if (dto.getLanguage() != null) {
-            product.setLanguage(dto.getLanguage());
-        }
-
-        if (dto.getPages() != null) {
-            product.setPages(dto.getPages());
-        }
-
-        if (dto.getStock() != null) {
-            product.setStock(dto.getStock());
-        }
-
-        if (dto.getCategory() != null) {
-            product.setCategory(dto.getCategory());
-        }
-
-        //  4. IMAGE UPDATE
+        // IMAGE UPDATE
         if (dto.getImage() != null && !dto.getImage().isEmpty()) {
             ImageValidator.validate(dto.getImage());
+
             try {
-                // delete old image
-                if (product.getImageUrl() != null) {
-                    Path oldPath = Paths.get(uploadDir,
-                            Paths.get(product.getImageUrl()).getFileName().toString());
-                    boolean deleted = Files.deleteIfExists(oldPath);
-                    System.out.println("Old image deleted: " + deleted);
-                }
-
-                // new image
-                String extension = StringUtils.getFilenameExtension(dto.getImage().getOriginalFilename());
-                if (extension == null) {
-                    throw new RuntimeException("Invalid file extension");
-                }
-                String fileName = UUID.randomUUID() + "." + extension;
-
-
-
-                Path uploadPath = Paths.get(uploadDir);
-                if (!Files.exists(uploadPath)) {
-                    Files.createDirectories(uploadPath);
-                }
-
-                Path filePath = uploadPath.resolve(fileName);
-                Files.copy(dto.getImage().getInputStream(), filePath);
-
-                product.setImageUrl("/uploads/products/" + fileName);
-
-            } catch (IOException e) {
+                newFileName = imageServiceImpl.save(dto.getImage());
+                product.setImageUrl(IMAGE_PATH + newFileName);
+            } catch (Exception e) {
                 throw new RuntimeException("Failed to update image", e);
             }
         }
 
-        //  5. SAVE
-        Product updatedProduct = productRepository.save(product);
+        // SAVE (SAFE)
+        Product updatedProduct;
+        try {
+            updatedProduct = productRepository.save(product);
+        } catch (Exception e) {
+            //  rollback file
+            if (newFileName != null) {
+                try {
+                    Path newPath = Paths.get(uploadDir, newFileName);
+                    Files.deleteIfExists(newPath);
+                } catch (IOException ex) {
+                    log.error("Failed to delete new image after DB error", ex);
+                }
+            }
+            throw e;
+        }
 
-        //  6. RETURN
+        // DELETE OLD IMAGE
+         deleteOldImage(oldImage,newFileName);
+
+        // RETURN
         return transformToDTO(updatedProduct);
     }
 
-}
+    private void updateFields(Product product, ProductUpdateRequestDto dto) {
+        if (dto.getName() != null) product.setName(dto.getName());
+        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
+        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
+        if (dto.getAuthor() != null) product.setAuthor(dto.getAuthor());
+        if (dto.getPublishedDate() != null) product.setPublishedDate(dto.getPublishedDate());
+        if (dto.getLanguage() != null) product.setLanguage(dto.getLanguage());
+        if (dto.getPages() != null) product.setPages(dto.getPages());
+        if (dto.getStock() != null) product.setStock(dto.getStock());
+        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
+    }
+
+    private void deleteOldImage(String oldImage, String newFileName) {
+        if (newFileName != null && oldImage != null &&
+                !oldImage.equals(IMAGE_PATH + newFileName)) {
+            try {
+                String oldFileName = Paths.get(oldImage).getFileName().toString();
+                Path oldPath = Paths.get(uploadDir, oldFileName);
+                Files.deleteIfExists(oldPath);
+            } catch (IOException e) {
+                log.warn("Failed to delete old image");
+            }
+        }
+    }
+ }
