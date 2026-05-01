@@ -10,17 +10,18 @@ import com.eazybook.marcus.util.ImageValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements IProductService {
 
     private final ProductRepository productRepository;
+    private final ImageServiceImpl imageServiceImpl;
     @Value("${product.upload.dir:uploads/products}")
     private String uploadDir;
 
@@ -59,15 +61,19 @@ public class ProductServiceImpl implements IProductService {
     }
 
 
+    @Transactional
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto addProduct(ProductRequestDto dto) {
         System.out.println("ProductService: addProduct");
-        boolean exists = productRepository
-                .existsByNameAndAuthor(dto.getName(), dto.getAuthor());
 
-        if (exists) {
-            throw new RuntimeException("Product already exists!");
-        }
+        String fileName = null;
+
+        try {
+            //  Image save
+            if (dto.getImage() != null && !dto.getImage().isEmpty()) {
+                fileName = imageServiceImpl.save(dto.getImage());
+            }
 
         Product product = new Product();
 
@@ -82,43 +88,27 @@ public class ProductServiceImpl implements IProductService {
         product.setCategory(dto.getCategory());
         product.setPopularity(0);
 
-        //  IMAGE HANDLE
-        MultipartFile image = dto.getImage();
-
-        if (image != null && !image.isEmpty()) {
-            ImageValidator.validate(dto.getImage());
-            try {
-                String extension = StringUtils.getFilenameExtension(image.getOriginalFilename());
-                String fileName = UUID.randomUUID() + "." + extension;
-
-                // create folder
-                Path uploadPath = Paths.get(uploadDir);
-                if (!Files.exists(uploadPath)) {
-                    Files.createDirectories(uploadPath);
-                }
-
-                // file path
-                Path filePath = uploadPath.resolve(fileName);
-
-                // file save
-                Files.copy(image.getInputStream(), filePath);
-
-                // into DB  URL save
+         if (fileName != null) {
                 product.setImageUrl("/uploads/products/" + fileName);
-
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to upload image", e);
             }
+
+            Product savedProduct = productRepository.save(product);
+
+            return transformToDTO(savedProduct);
+
+        } catch (Exception e) {
+
+            //  rollback file
+            if (fileName != null) {
+                imageServiceImpl.delete(fileName);
+            }
+
+            throw e;
         }
-
-        //  SAVE
-        Product savedProduct = productRepository.save(product);
-
-        //  DTO qaytarish
-        return transformToDTO(savedProduct);
     }
-
+    @Transactional
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public void deleteProduct(Long id) {
         System.out.println("ProductService: deleteProduct");
         Product product = productRepository.findById(id)
@@ -139,6 +129,7 @@ public class ProductServiceImpl implements IProductService {
     }
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto updateProduct(Long id, ProductUpdateRequestDto dto) {
         System.out.println("ProductService: updateProduct");
 

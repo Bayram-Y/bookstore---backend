@@ -40,7 +40,7 @@ public class Product extends BaseEntity {
     @Column(name = "author", nullable = false, length = 200)
     private String author;
 
-    @Column(name = "published_Date")
+    @Column(name = "published_date")
     private LocalDate publishedDate;
 
     @Column(name = "language", length = 50)

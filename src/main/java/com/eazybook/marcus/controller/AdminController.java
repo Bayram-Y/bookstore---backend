@@ -2,17 +2,14 @@ package com.eazybook.marcus.controller;
 
 import com.eazybook.marcus.constants.ApplicationConstants;
 import com.eazybook.marcus.dto.*;
-import com.eazybook.marcus.entity.Product;
 import com.eazybook.marcus.service.IContactService;
 import com.eazybook.marcus.service.IOrderService;
 import com.eazybook.marcus.service.IProductService;
-import com.eazybook.marcus.service.impl.ProductServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -63,6 +60,8 @@ public class AdminController {
                 new ResponseDto("200", "Contact #" + contactId + " has been closed.")
         );
     }
+
+    //  PRODUCT
 
     @PostMapping("/add-product")
     public ResponseEntity<ProductResponseDto> addProduct(@Valid @ModelAttribute ProductRequestDto dto) {
