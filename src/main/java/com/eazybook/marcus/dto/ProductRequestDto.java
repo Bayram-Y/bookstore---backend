@@ -18,7 +18,7 @@ public class ProductRequestDto {
     private String name;
 
     @NotBlank(message = "Description cannot be empty")
-    @Size(min = 5, max = 500, message = "Description must be between 5 and 500 characters")
+    @Size(max = 500, message = "Description cannot exceed 500 characters")
     private String description;
 
     @NotNull(message = "Price is required")

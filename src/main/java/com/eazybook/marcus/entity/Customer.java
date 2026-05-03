@@ -3,6 +3,7 @@ package com.eazybook.marcus.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,6 +35,7 @@ public class Customer extends BaseEntity {
     @NotNull
     @Column(name = "mobile_number", nullable = false, length = 15)
     private String mobileNumber;
+
 
     @Size(max = 500)
     @NotNull
