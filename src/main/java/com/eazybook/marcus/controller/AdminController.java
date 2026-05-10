@@ -64,14 +64,13 @@ public class AdminController {
     //  PRODUCT
 
     @PostMapping("/add-product")
-    public ResponseEntity<?> addProduct(@Valid @ModelAttribute ProductRequestDto dto) {
-        System.out.println("PostMapping: addProduct");
+    public ResponseEntity<?> addProduct(@ModelAttribute @Valid  ProductRequestDto dto) {
         ProductResponseDto response = iProductService.addProduct(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
 
-    @PutMapping("/products/update-product/{id}")
+    @PutMapping("/update-product/{id}")
     public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable Long id, @ModelAttribute ProductUpdateRequestDto productUpdateRequestDto) {
         System.out.println("PutMapping: updateProduct");
         ProductResponseDto response = iProductService.updateProduct(id, productUpdateRequestDto);

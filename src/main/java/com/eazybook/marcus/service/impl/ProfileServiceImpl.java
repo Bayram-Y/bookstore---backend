@@ -51,7 +51,7 @@ public class ProfileServiceImpl implements IProfileService {
 
     public Customer getAuthenticatedCustomer() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
+        String email = authentication.getName(); // via email
         return customerRepository.findByEmail(email).orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
     }

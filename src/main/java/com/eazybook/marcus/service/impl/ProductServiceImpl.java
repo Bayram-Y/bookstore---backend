@@ -7,6 +7,7 @@ import com.eazybook.marcus.entity.Product;
 import com.eazybook.marcus.repository.ProductRepository;
 import com.eazybook.marcus.service.IProductService;
 import com.eazybook.marcus.util.ImageValidator;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -16,6 +17,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -64,11 +66,18 @@ public class ProductServiceImpl implements IProductService {
     }
 
 
+    // Add Product
+
     @Transactional
     @Override
     @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto addProduct(ProductRequestDto dto) {
+
         System.out.println("ProductService: addProduct");
+        if (productRepository.existsByNameAndAuthor(
+                dto.getName(), dto.getAuthor())) {
+            throw new RuntimeException("Product already exists!");
+        }
 
         String fileName = null;
 
@@ -110,6 +119,91 @@ public class ProductServiceImpl implements IProductService {
         }
     }
 
+    // Update Product
+
+    @Transactional
+    @Override
+    @CacheEvict(value = "products", allEntries = true)
+    public ProductResponseDto updateProduct(Long id, ProductUpdateRequestDto dto) {
+
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        // 1. duplicate check (null-safe)
+        String name = dto.getName() != null ? dto.getName() : product.getName();
+        String author = dto.getAuthor() != null ? dto.getAuthor() : product.getAuthor();
+
+        if (productRepository.existsByNameAndAuthorAndIdNot(name, author, id)) {
+            throw new RuntimeException("Product already exists!");
+        }
+
+        // 2. FIELD UPDATE (PATCH STYLE - SAFE)
+        if (dto.getName() != null) product.setName(dto.getName());
+        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
+        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
+        if (dto.getAuthor() != null) product.setAuthor(dto.getAuthor());
+        if (dto.getPublishedDate() != null) product.setPublishedDate(dto.getPublishedDate());
+        if (dto.getLanguage() != null) product.setLanguage(dto.getLanguage());
+        if (dto.getPages() != null) product.setPages(dto.getPages());
+        if (dto.getStock() != null) product.setStock(dto.getStock());
+        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
+
+        // 3. IMAGE UPDATE (FULL SAFE)
+        if (dto.getImage() != null && !dto.getImage().isEmpty()) {
+
+            // validate faqat mavjud bo‘lsa
+            ImageValidator.validate(dto.getImage());
+
+            try {
+                String newFileName = imageServiceImpl.save(dto.getImage());
+
+                String oldImage = product.getImageUrl();
+                product.setImageUrl(IMAGE_PATH + newFileName);
+
+                // old image delete
+                deleteOldImage(oldImage, newFileName);
+
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to update image", e);
+            }
+        }
+
+        // 4. SAVE
+        System.out.println("ProductService: updatedProduct");
+        System.out.println("ProductService:");
+        Product saved = productRepository.save(product);
+
+        return transformToDTO(saved);
+    }
+
+//    private void updateFields(Product product, ProductUpdateRequestDto dto) {
+//        if (dto.getName() != null) product.setName(dto.getName());
+//        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
+//        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
+//        if (dto.getAuthor() != null) product.setAuthor(dto.getAuthor());
+//        if (dto.getPublishedDate() != null) product.setPublishedDate(dto.getPublishedDate());
+//        if (dto.getLanguage() != null) product.setLanguage(dto.getLanguage());
+//        if (dto.getPages() != null) product.setPages(dto.getPages());
+//        if (dto.getStock() != null) product.setStock(dto.getStock());
+//        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
+//    }
+
+    private void deleteOldImage(String oldImage, String newFileName) {
+        log.info("ProductService: deleteOldImage");
+        if (newFileName != null && oldImage != null &&
+                !oldImage.equals(IMAGE_PATH + newFileName)) {
+            try {
+                String oldFileName = Paths.get(oldImage).getFileName().toString();
+                Path oldPath = Paths.get(uploadDir, oldFileName);
+                Files.deleteIfExists(oldPath);
+            } catch (IOException e) {
+                log.warn("Failed to delete old image");
+            }
+        }
+    }
+
+
+    // Delete Product
 
     @Transactional
     @Override
@@ -133,88 +227,4 @@ public class ProductServiceImpl implements IProductService {
         productRepository.delete(product);
     }
 
-    @Transactional
-    @Override
-    @CacheEvict(value = "products", allEntries = true)
-    public ProductResponseDto updateProduct(Long id, ProductUpdateRequestDto dto) {
-        log.info("Updating product with id: {}", id);
-
-        //  1.find Product
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        //  2. Duplicate check (name + author)
-        String name = dto.getName() != null ? dto.getName() : product.getName();
-        String author = dto.getAuthor() != null ? dto.getAuthor() : product.getAuthor();
-
-        if (productRepository.existsByNameAndAuthorAndIdNot(name, author, id)) {
-            throw new RuntimeException("Product already exists!");
-        }
-
-        //  3. FIELD UPDATE
-          updateFields(product, dto);
-
-        String newFileName = null;
-        String oldImage = product.getImageUrl();
-
-        // IMAGE UPDATE
-        if (dto.getImage() != null && !dto.getImage().isEmpty()) {
-            ImageValidator.validate(dto.getImage());
-
-            try {
-                newFileName = imageServiceImpl.save(dto.getImage());
-                product.setImageUrl(IMAGE_PATH + newFileName);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to update image", e);
-            }
-        }
-
-        // SAVE (SAFE)
-        Product updatedProduct;
-        try {
-            updatedProduct = productRepository.save(product);
-        } catch (Exception e) {
-            //  rollback file
-            if (newFileName != null) {
-                try {
-                    Path newPath = Paths.get(uploadDir, newFileName);
-                    Files.deleteIfExists(newPath);
-                } catch (IOException ex) {
-                    log.error("Failed to delete new image after DB error", ex);
-                }
-            }
-            throw e;
-        }
-
-        // DELETE OLD IMAGE
-         deleteOldImage(oldImage,newFileName);
-
-        // RETURN
-        return transformToDTO(updatedProduct);
-    }
-
-    private void updateFields(Product product, ProductUpdateRequestDto dto) {
-        if (dto.getName() != null) product.setName(dto.getName());
-        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
-        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
-        if (dto.getAuthor() != null) product.setAuthor(dto.getAuthor());
-        if (dto.getPublishedDate() != null) product.setPublishedDate(dto.getPublishedDate());
-        if (dto.getLanguage() != null) product.setLanguage(dto.getLanguage());
-        if (dto.getPages() != null) product.setPages(dto.getPages());
-        if (dto.getStock() != null) product.setStock(dto.getStock());
-        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
-    }
-
-    private void deleteOldImage(String oldImage, String newFileName) {
-        if (newFileName != null && oldImage != null &&
-                !oldImage.equals(IMAGE_PATH + newFileName)) {
-            try {
-                String oldFileName = Paths.get(oldImage).getFileName().toString();
-                Path oldPath = Paths.get(uploadDir, oldFileName);
-                Files.deleteIfExists(oldPath);
-            } catch (IOException e) {
-                log.warn("Failed to delete old image");
-            }
-        }
-    }
- }
+}
