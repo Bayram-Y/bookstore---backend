@@ -51,7 +51,7 @@ public class ProductServiceImpl implements IProductService {
     private ProductResponseDto transformToDTO(Product product) {
         ProductResponseDto productDto = new ProductResponseDto();
         BeanUtils.copyProperties(product, productDto);
-        productDto.setId(product.getId()); // <-- to‘g‘ri obyektga set qilindi
+        productDto.setProductId(product.getId()); // <-- to‘g‘ri obyektga set qilindi
         return productDto;
     }
 
