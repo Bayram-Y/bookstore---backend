@@ -48,4 +48,9 @@ public class ProductRequestDto {
 
     @NotNull(message = "Category is required")
     private Category category;
+
+    // 🔥 ADD THIS
+    @DecimalMin(value = "0.0", message = "Discount cannot be negative")
+    @DecimalMax(value = "100.0", message = "Discount cannot exceed 100")
+    private BigDecimal discountPercent;
 }

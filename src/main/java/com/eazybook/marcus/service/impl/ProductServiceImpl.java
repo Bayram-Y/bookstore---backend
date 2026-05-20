@@ -7,7 +7,6 @@ import com.eazybook.marcus.entity.Product;
 import com.eazybook.marcus.repository.ProductRepository;
 import com.eazybook.marcus.service.IProductService;
 import com.eazybook.marcus.util.ImageValidator;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -16,16 +15,13 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,7 +36,7 @@ public class ProductServiceImpl implements IProductService {
     private static final String IMAGE_PATH = "/uploads/products/";
 
 
-    @Cacheable("products")
+//    @Cacheable("products")
     @Override
     public List<ProductResponseDto> getProducts() {
         System.out.println("ProductService: getProducts");
@@ -53,6 +49,19 @@ public class ProductServiceImpl implements IProductService {
         BeanUtils.copyProperties(product, productDto);
         productDto.setProductId(product.getId()); // <-- to‘g‘ri obyektga set qilindi
         return productDto;
+    }
+
+    private BigDecimal calculateDiscountPrice(BigDecimal price, BigDecimal discountPercent) {
+        if (price == null || discountPercent == null) return price;
+
+        if (discountPercent.compareTo(BigDecimal.ZERO) <= 0) {
+            return price;
+        }
+
+        BigDecimal discount = price.multiply(discountPercent)
+                .divide(BigDecimal.valueOf(100));
+
+        return price.subtract(discount);
     }
 
     @Override
@@ -70,7 +79,7 @@ public class ProductServiceImpl implements IProductService {
 
     @Transactional
     @Override
-    @CacheEvict(value = "products", allEntries = true)
+//    @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto addProduct(ProductRequestDto dto) {
 
         System.out.println("ProductService: addProduct");
@@ -99,6 +108,18 @@ public class ProductServiceImpl implements IProductService {
         product.setStock(dto.getStock());
         product.setCategory(dto.getCategory());
         product.setPopularity(0);
+            //  1. discountni DTO dan ol
+            BigDecimal discount = dto.getDiscountPercent() != null
+                    ? dto.getDiscountPercent()
+                    : BigDecimal.ZERO;
+
+           // 🔥 2. entityga set qil
+            product.setDiscountPercent(discount);
+
+          // 🔥 3. hisobla
+            product.setDiscountPrice(
+                    calculateDiscountPrice(dto.getPrice(), discount)
+            );
 
          if (fileName != null) {
                 product.setImageUrl(IMAGE_PATH + fileName);
@@ -123,7 +144,7 @@ public class ProductServiceImpl implements IProductService {
 
     @Transactional
     @Override
-    @CacheEvict(value = "products", allEntries = true)
+//    @CacheEvict(value = "products", allEntries = true)
     public ProductResponseDto updateProduct(Long id, ProductUpdateRequestDto dto) {
 
         Product product = productRepository.findById(id)
@@ -148,6 +169,20 @@ public class ProductServiceImpl implements IProductService {
         if (dto.getStock() != null) product.setStock(dto.getStock());
         if (dto.getCategory() != null) product.setCategory(dto.getCategory());
 
+        //  agar dto yuborsa yangila
+        if (dto.getDiscountPercent() != null) {
+            product.setDiscountPercent(dto.getDiscountPercent());
+        }
+
+        //  har doim safe discount ishlat
+        BigDecimal discount = product.getDiscountPercent() != null
+                ? product.getDiscountPercent()
+                : BigDecimal.ZERO;
+
+        product.setDiscountPrice(
+                calculateDiscountPrice(product.getPrice(), discount)
+        );
+
         // 3. IMAGE UPDATE (FULL SAFE)
         if (dto.getImage() != null && !dto.getImage().isEmpty()) {
 
@@ -170,23 +205,11 @@ public class ProductServiceImpl implements IProductService {
 
         // 4. SAVE
         System.out.println("ProductService: updatedProduct");
-        System.out.println("ProductService:");
         Product saved = productRepository.save(product);
 
         return transformToDTO(saved);
     }
 
-//    private void updateFields(Product product, ProductUpdateRequestDto dto) {
-//        if (dto.getName() != null) product.setName(dto.getName());
-//        if (dto.getDescription() != null) product.setDescription(dto.getDescription());
-//        if (dto.getPrice() != null) product.setPrice(dto.getPrice());
-//        if (dto.getAuthor() != null) product.setAuthor(dto.getAuthor());
-//        if (dto.getPublishedDate() != null) product.setPublishedDate(dto.getPublishedDate());
-//        if (dto.getLanguage() != null) product.setLanguage(dto.getLanguage());
-//        if (dto.getPages() != null) product.setPages(dto.getPages());
-//        if (dto.getStock() != null) product.setStock(dto.getStock());
-//        if (dto.getCategory() != null) product.setCategory(dto.getCategory());
-//    }
 
     private void deleteOldImage(String oldImage, String newFileName) {
         log.info("ProductService: deleteOldImage");
@@ -207,7 +230,7 @@ public class ProductServiceImpl implements IProductService {
 
     @Transactional
     @Override
-    @CacheEvict(value = "products", allEntries = true)
+//    @CacheEvict(value = "products", allEntries = true)
     public void deleteProduct(Long id) {
         System.out.println("ProductService: deleteProduct");
         Product product = productRepository.findById(id)

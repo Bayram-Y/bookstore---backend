@@ -70,7 +70,7 @@ public class AdminController {
     }
 
 
-    @PutMapping("/update-product/{id}")
+    @PostMapping("/update-product/{id}")
     public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable Long id, @ModelAttribute ProductUpdateRequestDto productUpdateRequestDto) {
         System.out.println("PutMapping: updateProduct");
         ProductResponseDto response = iProductService.updateProduct(id, productUpdateRequestDto);

@@ -1,6 +1,8 @@
 package com.eazybook.marcus.dto;
 
 import com.eazybook.marcus.enums.Category;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,4 +23,8 @@ public class ProductUpdateRequestDto {
     private Integer pages;
     private Integer stock;
     private Category category;
+    @DecimalMin(value = "0.0", message = "Discount cannot be negative")
+    @DecimalMax(value = "100.0", message = "Discount cannot exceed 100")
+    private BigDecimal discountPercent;
+
 }

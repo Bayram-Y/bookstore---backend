@@ -27,4 +27,8 @@ public class ProductResponseDto {
     private Integer pages;
     private Integer stock;
     private Category category;
+    // 🔥 ADD QILINDI
+    private BigDecimal discountPercent;
+    private BigDecimal discountPrice;
+
 }
