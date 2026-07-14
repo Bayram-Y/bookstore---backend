@@ -30,5 +30,7 @@ public class ProductResponseDto {
     // 🔥 ADD QILINDI
     private BigDecimal discountPercent;
     private BigDecimal discountPrice;
+    int likesCount;
+    boolean isLikedByCurrentUser;
 
 }

@@ -61,4 +61,7 @@ public class Product extends BaseEntity {
 
     @Column(name = "discount_price", precision = 10, scale = 2)
     private BigDecimal discountPrice;
+
+    @Column(name = "likes_count", nullable = false)
+    private Integer likesCount = 0;
 }

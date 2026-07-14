@@ -4,6 +4,7 @@ import com.eazybook.marcus.dto.ProductRequestDto;
 import com.eazybook.marcus.dto.ProductResponseDto;
 import com.eazybook.marcus.dto.ProductUpdateRequestDto;
 import com.eazybook.marcus.entity.Product;
+import com.eazybook.marcus.repository.LikeRepository;
 import com.eazybook.marcus.repository.ProductRepository;
 import com.eazybook.marcus.service.IProductService;
 import com.eazybook.marcus.util.ImageValidator;
@@ -31,6 +32,7 @@ public class ProductServiceImpl implements IProductService {
 
     private final ProductRepository productRepository;
     private final ImageServiceImpl imageServiceImpl;
+    private final LikeRepository likeRepository;
     @Value("${product.upload.dir:uploads/products}")
     private String uploadDir;
     private static final String IMAGE_PATH = "/uploads/products/";
@@ -48,6 +50,10 @@ public class ProductServiceImpl implements IProductService {
         ProductResponseDto productDto = new ProductResponseDto();
         BeanUtils.copyProperties(product, productDto);
         productDto.setProductId(product.getId()); // <-- to‘g‘ri obyektga set qilindi
+        productDto.setLikesCount(
+                likeRepository.countByProductId(product.getId())
+        );
+
         return productDto;
     }
 

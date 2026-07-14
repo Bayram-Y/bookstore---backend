@@ -150,3 +150,17 @@ VALUES ('ROLE_USER', 'system', NOW());
 
 INSERT INTO roles (name, created_by, created_at)
 VALUES ('ROLE_ADMIN', 'system', NOW());
+
+CREATE TABLE likes (
+                       like_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                       customer_id BIGINT NOT NULL,
+                       product_id BIGINT NOT NULL,
+
+                       CONSTRAINT fk_like_customer FOREIGN KEY (customer_id)
+                           REFERENCES customers(customer_id) ON DELETE CASCADE,
+
+                       CONSTRAINT fk_like_product FOREIGN KEY (product_id)
+                           REFERENCES products(product_id) ON DELETE CASCADE,
+
+                       CONSTRAINT unique_like UNIQUE (customer_id, product_id)
+);

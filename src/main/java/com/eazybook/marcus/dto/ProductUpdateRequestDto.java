@@ -26,5 +26,7 @@ public class ProductUpdateRequestDto {
     @DecimalMin(value = "0.0", message = "Discount cannot be negative")
     @DecimalMax(value = "100.0", message = "Discount cannot exceed 100")
     private BigDecimal discountPercent;
+    int likesCount;
+    boolean isLikedByCurrentUser;
 
 }
